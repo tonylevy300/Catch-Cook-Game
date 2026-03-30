@@ -211,7 +211,10 @@
                 </div>
 
                 <div class="pointer-events-auto transform origin-top-right scale-[0.75] md:scale-95 flex flex-col items-end gap-3">
-                    <button id="pause-btn" class="bg-black/90 border border-white/10 rounded-full w-12 h-12 flex items-center justify-center text-xl shadow-2xl">⏸</button>
+                    <div class="flex gap-2">
+                        <button id="mute-btn" class="bg-black/90 border border-white/10 rounded-full w-12 h-12 flex items-center justify-center text-xl shadow-2xl active:scale-95 transition-transform">🎵</button>
+                        <button id="pause-btn" class="bg-black/90 border border-white/10 rounded-full w-12 h-12 flex items-center justify-center text-xl shadow-2xl active:scale-95 transition-transform">⏸</button>
+                    </div>
                     <div id="quota-display" class="hud-tab rounded-2xl px-6 py-2.5 flex items-center shadow-2xl">
                         <span id="catch-progress" class="text-brand font-brand text-2xl tracking-widest leading-none">0/5</span>
                     </div>
@@ -334,6 +337,12 @@
         let moveInput = { x: 0, y: 0 }, isActionPressed = false;
         let waterLine = 0, player = { x: 0, y: 0 }, scope = { x: 0, y: 0 }; 
         
+        // --- AUDIO SYSTEM ---
+        const bgMusic = new Audio('bgm.mp3');
+        bgMusic.loop = true;
+        bgMusic.volume = 0.4; // 40% volume so it isn't too loud
+        let isMuted = false;
+
         let hook = { 
             x: 0, 
             y: 0, 
@@ -837,12 +846,47 @@
 
             document.getElementById('hunt-btn').onclick = () => startGame('hunt');
             document.getElementById('fish-btn').onclick = () => startGame('fish');
-            document.getElementById('inst-start-btn').onclick = () => { isPlaying = true; screens.instructions.classList.add('hidden'); screens.game.classList.remove('hidden'); gameRoutine(); };
+            
+            document.getElementById('inst-start-btn').onclick = () => { 
+                isPlaying = true; 
+                screens.instructions.classList.add('hidden'); 
+                screens.game.classList.remove('hidden'); 
+                
+                // Start music on first player interaction
+                if(!isMuted) {
+                    bgMusic.play().catch(e => console.log("Audio autoplay blocked:", e));
+                }
+                
+                gameRoutine(); 
+            };
+            
             document.getElementById('menu-btn').onclick = () => location.reload();
             document.getElementById('restart-btn').onclick = () => startGame(gameMode);
-            document.getElementById('pause-btn').onclick = () => { isPaused = true; screens.pause.classList.remove('hidden'); };
-            document.getElementById('resume-btn').onclick = () => { isPaused = false; screens.pause.classList.add('hidden'); gameLoop = requestAnimationFrame(gameRoutine); };
+            
+            document.getElementById('pause-btn').onclick = () => { 
+                isPaused = true; 
+                screens.pause.classList.remove('hidden'); 
+                bgMusic.pause(); // Pause music when game pauses
+            };
+            
+            document.getElementById('resume-btn').onclick = () => { 
+                isPaused = false; 
+                screens.pause.classList.add('hidden'); 
+                if(!isMuted) bgMusic.play(); // Resume music
+                gameLoop = requestAnimationFrame(gameRoutine); 
+            };
+            
             document.getElementById('pause-menu-btn').onclick = () => location.reload();
+
+            // Mute Toggle Logic
+            const muteBtn = document.getElementById('mute-btn');
+            if(muteBtn) {
+                muteBtn.onclick = () => {
+                    isMuted = !isMuted;
+                    bgMusic.muted = isMuted;
+                    muteBtn.innerText = isMuted ? '🔇' : '🎵';
+                };
+            }
 
             resizeCanvas();
         }
