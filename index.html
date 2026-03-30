@@ -25,7 +25,7 @@
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100%; /* Fallback */
+            height: 100%; 
             position: fixed; 
             background-color: #000;
             font-family: 'Open Sans', sans-serif;
@@ -37,7 +37,8 @@
         }
 
         .safe-pt { padding-top: max(1rem, env(safe-area-inset-top)) !important; }
-        .safe-pb { padding-bottom: max(1.2rem, env(safe-area-inset-bottom)) !important; }
+        /* Increased bottom safe area to clear the iPhone Home Indicator shown in screenshot */
+        .safe-pb { padding-bottom: max(2.5rem, env(safe-area-inset-bottom)) !important; }
         .safe-pl { padding-left: max(2.5rem, env(safe-area-inset-left)) !important; }
         .safe-pr { padding-right: max(2.5rem, env(safe-area-inset-right)) !important; }
 
@@ -152,29 +153,23 @@
             #rotate-overlay { display: flex; } 
         }
 
-        /* Extremely Short Screens (Landscape with Browser Tabs visible) */
         @media (max-height: 450px) {
             .hills-container { height: 22vh; }
-            
-            /* Shrink Start Menu Elements */
             .logo-main { max-height: 22vh !important; }
             .start-title { font-size: 1.5rem !important; margin-top: 0.25rem !important; margin-bottom: 0.25rem !important; }
             .mb-6 { margin-bottom: 0.5rem !important; }
             
-            /* Shrink Expedition Cards heavily */
             .card-expedition { max-width: 130px !important; padding: 0.5rem !important; border-width: 3px !important; border-radius: 1.2rem !important; }
             .card-expedition span:first-child { font-size: 3rem !important; margin-bottom: 0 !important; }
             .card-expedition span:nth-child(2) { font-size: 1.8rem !important; }
-            .card-expedition span:last-child { display: none; } /* Hide 'Expedition' subtitle to save vertical space */
+            .card-expedition span:last-child { display: none; } 
             
-            /* Shrink HUD Controls */
             #joystick-zone { width: 80px !important; height: 80px !important; }
             #action-btn { width: 80px !important; height: 80px !important; }
             #action-icon { font-size: 2.5rem !important; }
             .pb-12 { padding-bottom: 1rem !important; }
             .px-16 { padding-left: 2rem !important; padding-right: 2rem !important; }
             
-            /* Scale HUD UI */
             .hud-tab { transform: scale(0.65) !important; transform-origin: top; }
         }
     </style>
@@ -187,7 +182,6 @@
         <p class="font-sans text-zinc-500 text-lg max-w-sm">Please flip your phone sideways to start the expedition!</p>
     </div>
 
-    <!-- The container sets absolute sizing handled by JS innerHeight to fight browser UI -->
     <div id="game-container" class="absolute inset-0 w-full bg-black overflow-hidden" style="height: 100%;">
         <canvas id="gameCanvas" class="block w-full h-full absolute inset-0 z-0"></canvas>
 
@@ -315,6 +309,11 @@
         let gameLoop, isPlaying = false, isPaused = false, isCookingPhase = false;
         let gameMode = 'fish', score = 0, frameCount = 0, catches = 0;
         let globalScale = 1;
+        
+        // Logical Game Dimensions (separated from physical retina canvas)
+        let gameWidth = window.innerWidth;
+        let gameHeight = window.innerHeight;
+
         const catchQuota = 5;
         let cookMeterVal = 0, cookDir = 4.5, cookResult = null, cookDelayTimer = 0;
         let moveInput = { x: 0, y: 0 }, isActionPressed = false;
@@ -333,23 +332,31 @@
         let targets = [], particles = [], caughtFishes = [];
 
         function resizeCanvas() {
-            // FIX for browser tabs: dynamically lock body and container height to exact visual viewport
-            let exactHeight = window.innerHeight;
-            document.body.style.height = `${exactHeight}px`;
-            gameContainer.style.height = `${exactHeight}px`;
+            gameWidth = window.innerWidth;
+            gameHeight = window.innerHeight;
             
-            canvas.width = window.innerWidth;
-            canvas.height = exactHeight;
-            waterLine = canvas.height * 0.45;
+            // Fix layout jumping
+            document.body.style.height = `${gameHeight}px`;
+            gameContainer.style.height = `${gameHeight}px`;
             
-            // Adjust scale aggressively for very short viewports
-            globalScale = Math.min(1.3, Math.max(0.45, canvas.height / 500));
+            // HIGH-DPI RETINA SCALING FOR CRISP GRAPHICS
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = gameWidth * dpr;
+            canvas.height = gameHeight * dpr;
+            canvas.style.width = `${gameWidth}px`;
+            canvas.style.height = `${gameHeight}px`;
+            
+            // Tell the canvas to scale all drawing commands to match the Retina display
+            ctx.scale(dpr, dpr);
+            
+            waterLine = gameHeight * 0.45;
+            globalScale = Math.min(1.3, Math.max(0.45, gameHeight / 500));
             
             checkOrientation();
             
             if(!isPlaying) {
-                player.x = canvas.width / 2; player.y = waterLine;
-                scope.x = canvas.width / 2; scope.y = canvas.height / 2;
+                player.x = gameWidth / 2; player.y = waterLine;
+                scope.x = gameWidth / 2; scope.y = gameHeight / 2;
                 drawBackground();
             }
         }
@@ -439,24 +446,22 @@
 
         function updatePlayer() {
             let speed = 9; 
-            if (gameMode === 'fish') { player.x += moveInput.x * speed; player.x = Math.max(50, Math.min(canvas.width - 50, player.x)); }
-            else { scope.x += moveInput.x * (speed * 2.5); scope.y += moveInput.y * (speed * 2.5); scope.x = Math.max(0, Math.min(canvas.width, scope.x)); scope.y = Math.max(0, Math.min(canvas.height, scope.y)); }
+            if (gameMode === 'fish') { player.x += moveInput.x * speed; player.x = Math.max(50, Math.min(gameWidth - 50, player.x)); }
+            else { scope.x += moveInput.x * (speed * 2.5); scope.y += moveInput.y * (speed * 2.5); scope.x = Math.max(0, Math.min(gameWidth, scope.x)); scope.y = Math.max(0, Math.min(gameHeight, scope.y)); }
         }
 
         function spawnTargets() {
             let rate = Math.max(40, 100 - (score / 15));
-            
-            // DIFFICULTY SCALING: Increases target speed by 30% for every successful catch
             let speedMultiplier = 1 + (catches * 0.30); 
 
             if (frameCount % Math.floor(rate) === 0) {
-                let isLeft = Math.random() > 0.5, startX = isLeft ? -100 : canvas.width + 100;
+                let isLeft = Math.random() > 0.5, startX = isLeft ? -100 : gameWidth + 100;
                 if (gameMode === 'fish') {
                     let baseSpeed = 6.5 + Math.random() * 4;
                     let finalSpeed = baseSpeed * speedMultiplier;
                     targets.push({ 
                         x: startX, 
-                        y: waterLine + 50 + Math.random() * (canvas.height - waterLine - 100), 
+                        y: waterLine + 50 + Math.random() * (gameHeight - waterLine - 100), 
                         vx: isLeft ? finalSpeed : -finalSpeed, 
                         emoji: Math.random() > 0.5 ? '🐟' : '🐡', 
                         points: 15 
@@ -466,7 +471,7 @@
                     let finalSpeed = baseSpeed * speedMultiplier;
                     targets.push({ 
                         x: startX, 
-                        y: canvas.height * 0.82, 
+                        y: gameHeight * 0.82, 
                         vx: isLeft ? finalSpeed : -finalSpeed, 
                         emoji: '🦌', 
                         points: 30 
@@ -486,7 +491,7 @@
         }
 
         function updateFishing() {
-            maxDepth = canvas.height - waterLine - 50;
+            maxDepth = gameHeight - waterLine - 50;
             if (hook.state === 'sinking') { 
                 hook.depth += 7; hook.y = waterLine + hook.depth; tension = 0; 
                 if (hook.depth >= maxDepth) { hook.state = 'waiting'; if(actionIcon) actionIcon.innerText = '🎣'; } 
@@ -558,7 +563,7 @@
                     hook.fightTimer = 30; 
                     showMessage("BITE! REEL IT IN!", "text-brand"); 
                 }
-                if (t.x < -180 || t.x > canvas.width + 180) targets.splice(i, 1);
+                if (t.x < -180 || t.x > gameWidth + 180) targets.splice(i, 1);
             }
         }
 
@@ -591,13 +596,13 @@
         }
 
         function drawBackground() {
-            ctx.clearRect(0,0,canvas.width, canvas.height);
+            ctx.clearRect(0,0,gameWidth, gameHeight);
             if (gameMode === 'fish') {
-                let sky = ctx.createLinearGradient(0,0,0,waterLine); sky.addColorStop(0, "#4facfe"); sky.addColorStop(1, "#E0F6FF"); ctx.fillStyle = sky; ctx.fillRect(0,0,canvas.width, waterLine);
-                let water = ctx.createLinearGradient(0,waterLine,0,canvas.height); water.addColorStop(0, "#1ca3ec"); water.addColorStop(1, "#032b44"); ctx.fillStyle = water; ctx.fillRect(0, waterLine, canvas.width, canvas.height);
+                let sky = ctx.createLinearGradient(0,0,0,waterLine); sky.addColorStop(0, "#4facfe"); sky.addColorStop(1, "#E0F6FF"); ctx.fillStyle = sky; ctx.fillRect(0,0,gameWidth, waterLine);
+                let water = ctx.createLinearGradient(0,waterLine,0,gameHeight); water.addColorStop(0, "#1ca3ec"); water.addColorStop(1, "#032b44"); ctx.fillStyle = water; ctx.fillRect(0, waterLine, gameWidth, gameHeight);
             } else {
-                ctx.fillStyle = "#3a5a2e"; ctx.fillRect(0,0,canvas.width, canvas.height); 
-                ctx.fillStyle = "#4a3b2c"; ctx.fillRect(0, canvas.height*0.8, canvas.width, canvas.height*0.2);
+                ctx.fillStyle = "#3a5a2e"; ctx.fillRect(0,0,gameWidth, gameHeight); 
+                ctx.fillStyle = "#4a3b2c"; ctx.fillRect(0, gameHeight*0.8, gameWidth, gameHeight*0.2);
             }
         }
 
@@ -639,7 +644,7 @@
                 ctx.save();
                 let grad = ctx.createRadialGradient(scope.x, scope.y, 10, scope.x, scope.y, 300 * s);
                 grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(1, 'rgba(0,0,0,0.6)');
-                ctx.fillStyle = grad; ctx.fillRect(0,0,canvas.width, canvas.height);
+                ctx.fillStyle = grad; ctx.fillRect(0,0,gameWidth, gameHeight);
                 ctx.strokeStyle = '#FFE600'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(scope.x, scope.y, 45 * s, 0, Math.PI*2); ctx.stroke(); 
                 ctx.restore();
             }
@@ -668,7 +673,7 @@
 
             if (isCookingPhase) {
                 ctx.fillStyle = "rgba(0,0,0,0.8)";
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillRect(0, 0, gameWidth, gameHeight);
                 drawCookingScene();
             }
 
@@ -676,8 +681,8 @@
         }
 
         function drawCookingScene() {
-            let cx = canvas.width / 2;
-            let cy = canvas.height / 2 - 40;
+            let cx = gameWidth / 2;
+            let cy = gameHeight / 2 - 40;
 
             ctx.fillStyle = '#FFE600'; 
             ctx.font = 'bold ' + Math.max(24, 50 * globalScale) + 'px "Bebas Neue"'; 
@@ -688,7 +693,7 @@
             let emojis = caughtFishes.map(f => f.emoji).join(' ');
             ctx.fillText(emojis, cx, cy - 30 * globalScale);
 
-            let barW = Math.min(360, canvas.width * 0.7);
+            let barW = Math.min(360, gameWidth * 0.7);
             let barH = Math.max(20, 40 * globalScale);
             let barX = cx - barW / 2;
             let barY = cy;
@@ -718,14 +723,6 @@
             let s = globalScale;
             ctx.font = (48 * s) + 'px Arial'; 
             ctx.textAlign = 'center';
-            
-            // FIX: Prevent monochrome emojis from blending into the water
-            ctx.fillStyle = '#FFFFFF'; 
-            
-            // Add a drop shadow so all fish pop out clearly
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-            ctx.shadowOffsetY = 3 * s;
-            ctx.shadowBlur = 5 * s;
 
             for (let t of targets) { 
                 ctx.save(); 
@@ -740,31 +737,43 @@
                 
                 if (hook.fishOnLine === t && hook.isFighting) {
                     ctx.font = (24 * s) + 'px Arial';
+                    
+                    // High-Performance fake shadow
+                    ctx.fillStyle = 'black';
+                    ctx.fillText('💢', 2, -35 * s + 2);
+                    
+                    ctx.fillStyle = 'white';
                     ctx.fillText('💢', 0, -35 * s);
                     ctx.font = (48 * s) + 'px Arial';
                 }
 
-                ctx.fillText(t.emoji, 0, 0); 
+                // HIGH-PERFORMANCE SHADOW FIX: Replaces expensive shadowBlur
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillText(t.emoji, 2 * s, 3 * s); // Offset shadow text
+                
+                ctx.fillStyle = '#FFFFFF'; 
+                ctx.fillText(t.emoji, 0, 0); // Main color text
+                
                 ctx.restore(); 
             }
             
             for (let f of caughtFishes) { 
                 ctx.save(); 
                 ctx.translate(f.x, f.y); 
+                
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillText(f.emoji, 2 * s, 3 * s);
+                
+                ctx.fillStyle = '#FFFFFF';
                 ctx.fillText(f.emoji, 0, 0); 
                 ctx.restore(); 
             }
             
-            // Clear shadows before drawing particles so the game doesn't lag
-            ctx.shadowColor = 'transparent';
-            ctx.shadowBlur = 0;
-            ctx.shadowOffsetY = 0;
-
             for (let i = particles.length - 1; i >= 0; i--) { 
                 let p = particles[i]; 
                 p.x += p.vx; p.y += p.vy; p.life -= 0.05; 
                 ctx.fillStyle = p.color; 
-                ctx.globalAlpha = Math.max(0, p.life); // Fixed to ensure no negative alpha errors
+                ctx.globalAlpha = Math.max(0, p.life); 
                 ctx.fillRect(p.x, p.y, 5 * s, 5 * s); 
                 if (p.life <= 0) particles.splice(i, 1); 
             } 
@@ -786,7 +795,6 @@
             screens.start.classList.add('hidden'); 
             screens.instructions.classList.remove('hidden');
             
-            // Re-trigger resize to ensure canvas adopts to potential browser UI changes on load
             setTimeout(resizeCanvas, 100);
         }
 
@@ -821,7 +829,6 @@
             document.getElementById('resume-btn').onclick = () => { isPaused = false; screens.pause.classList.add('hidden'); gameLoop = requestAnimationFrame(gameRoutine); };
             document.getElementById('pause-menu-btn').onclick = () => location.reload();
 
-            // Initial sizing
             resizeCanvas();
         }
 
