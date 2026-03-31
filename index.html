@@ -237,20 +237,20 @@
                 <div class="hill hill-1"></div>
             </div>
 
-            <div class="flex flex-col items-center mb-4 sm:mb-8 relative z-20">
-                <img src="Catch Cook Logo 2.png" alt="Catch Cook" class="max-h-[25vh] sm:max-h-[35vh] w-auto object-contain logo-main">
-                <h1 class="text-black font-brand text-3xl sm:text-4xl tracking-[0.4em] mt-2 leading-none opacity-40 uppercase">THE GAME</h1>
+            <div class="flex flex-col items-center mb-3 sm:mb-6 relative z-20">
+                <img src="Catch Cook Logo 2.png" alt="Catch Cook" class="h-28 sm:h-36 md:h-48 w-auto object-contain logo-main">
+                <h1 class="text-black font-brand text-3xl sm:text-4xl md:text-5xl tracking-[0.4em] mt-1 sm:mt-2 leading-none opacity-40 uppercase">THE GAME</h1>
             </div>
 
-            <div class="flex flex-row gap-6 sm:gap-14 px-4 w-full justify-center items-stretch relative z-20 mt-2">
-                <button id="hunt-btn" class="card-expedition w-[160px] sm:w-[220px] p-4 sm:p-8 flex flex-col items-center">
-                    <span class="text-7xl sm:text-8xl mb-2 drop-shadow-lg">🌲</span>
-                    <span class="text-black font-brand text-4xl sm:text-5xl leading-none">HUNT</span>
+            <div class="flex flex-row gap-4 sm:gap-10 md:gap-14 px-4 w-full justify-center items-stretch relative z-20 mt-1 sm:mt-2">
+                <button id="hunt-btn" class="card-expedition w-40 sm:w-52 md:w-64 p-3 sm:p-6 md:p-8 flex flex-col items-center">
+                    <span class="text-6xl sm:text-7xl md:text-8xl mb-1 sm:mb-2 drop-shadow-lg">🌲</span>
+                    <span class="text-black font-brand text-4xl sm:text-5xl md:text-6xl leading-none">HUNT</span>
                     <span class="text-zinc-400 text-[10px] sm:text-xs font-black uppercase tracking-widest mt-1">Expedition</span>
                 </button>
-                <button id="fish-btn" class="card-expedition w-[160px] sm:w-[220px] p-4 sm:p-8 flex flex-col items-center">
-                    <span class="text-7xl sm:text-8xl mb-2 drop-shadow-lg">🌊</span>
-                    <span class="text-black font-brand text-4xl sm:text-5xl leading-none">FISH</span>
+                <button id="fish-btn" class="card-expedition w-40 sm:w-52 md:w-64 p-3 sm:p-6 md:p-8 flex flex-col items-center">
+                    <span class="text-6xl sm:text-7xl md:text-8xl mb-1 sm:mb-2 drop-shadow-lg">🌊</span>
+                    <span class="text-black font-brand text-4xl sm:text-5xl md:text-6xl leading-none">FISH</span>
                     <span class="text-zinc-400 text-[10px] sm:text-xs font-black uppercase tracking-widest mt-1">Expedition</span>
                 </button>
             </div>
@@ -323,6 +323,9 @@
         let moveInput = { x: 0, y: 0 }, isActionPressed = false;
         let waterLine = 0, player = { x: 0, y: 0 }, scope = { x: 0, y: 0 }; 
         
+        // Cache variables to prevent extreme mobile lag
+        let skyGradient, waterGradient;
+
         // --- AUDIO SYSTEM ---
         const bgMusic = new Audio('bgm.mp3');
         bgMusic.loop = true;
@@ -360,7 +363,8 @@
             document.body.style.height = `${gameHeight}px`;
             gameContainer.style.height = `${gameHeight}px`;
             
-            const dpr = window.devicePixelRatio || 1;
+            // CAP SCALING TO 2x to prevent extreme lag on modern high-end phones
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
             canvas.width = gameWidth * dpr;
             canvas.height = gameHeight * dpr;
             canvas.style.width = `${gameWidth}px`;
@@ -370,6 +374,15 @@
             
             waterLine = gameHeight * 0.45;
             globalScale = Math.min(1.3, Math.max(0.45, gameHeight / 500));
+            
+            // CACHE GRADIENTS (Creating them every frame kills mobile performance)
+            skyGradient = ctx.createLinearGradient(0,0,0,waterLine);
+            skyGradient.addColorStop(0, "#4facfe"); 
+            skyGradient.addColorStop(1, "#E0F6FF");
+            
+            waterGradient = ctx.createLinearGradient(0,waterLine,0,gameHeight);
+            waterGradient.addColorStop(0, "#1ca3ec"); 
+            waterGradient.addColorStop(1, "#032b44");
             
             checkOrientation();
             
@@ -629,8 +642,10 @@
         function drawBackground() {
             ctx.clearRect(0,0,gameWidth, gameHeight);
             if (gameMode === 'fish') {
-                let sky = ctx.createLinearGradient(0,0,0,waterLine); sky.addColorStop(0, "#4facfe"); sky.addColorStop(1, "#E0F6FF"); ctx.fillStyle = sky; ctx.fillRect(0,0,gameWidth, waterLine);
-                let water = ctx.createLinearGradient(0,waterLine,0,gameHeight); water.addColorStop(0, "#1ca3ec"); water.addColorStop(1, "#032b44"); ctx.fillStyle = water; ctx.fillRect(0, waterLine, gameWidth, gameHeight);
+                ctx.fillStyle = skyGradient; 
+                ctx.fillRect(0,0,gameWidth, waterLine);
+                ctx.fillStyle = waterGradient; 
+                ctx.fillRect(0, waterLine, gameWidth, gameHeight);
             } else {
                 ctx.fillStyle = "#3a5a2e"; ctx.fillRect(0,0,gameWidth, gameHeight); 
                 ctx.fillStyle = "#4a3b2c"; ctx.fillRect(0, gameHeight*0.8, gameWidth, gameHeight*0.2);
@@ -809,7 +824,8 @@
             ctx.globalAlpha = 1;
         }
 
-        function createParticles(x, y, color) { for (let i = 0; i < 15; i++) particles.push({ x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1, color }); }
+        // Reduced particles from 15 to 8 to save mobile processing power
+        function createParticles(x, y, color) { for (let i = 0; i < 8; i++) particles.push({ x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1, color }); }
 
         function startGame(mode) {
             gameMode = mode; score = 0; catches = 0; frameCount = 0; targets = []; caughtFishes = []; isCookingPhase = false; ammo = maxAmmo;
